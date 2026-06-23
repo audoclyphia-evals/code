@@ -1,4 +1,4 @@
-# pylint: disable=too-few-public-methods
+# pylint: disable=too-few-public-methods  # Module defining command classes for the allocation domain. Contains base Command class and dataclass implementations for Allocate, CreateBatch, ChangeBatchQuantity, and Deallocate commands to handle domain operations.
 from datetime import date
 from typing import Optional
 from dataclasses import dataclass

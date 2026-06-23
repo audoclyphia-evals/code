@@ -1,0 +1,64 @@
+sequenceDiagram
+    autonumber
+    participant Client as "HTTP Client"
+    participant Flask as "Flask App (allocate_endpoint)"
+    participant MBus as "Message Bus (messagebus.py)"
+    participant Handler as "Allocate Handler (handlers.py)"
+    participant UoW as "Unit of Work (unit_of_work.py)"
+    participant Repo as "Repository (repository.py)"
+    participant Product as "Product (model.py)"
+
+    %% Flow traced from scope_function_body: flask_app.py allocate_endpoint
+    Client->>Flask: POST /allocate (orderid, sku, qty)
+    activate Flask
+    Flask->>Flask: _get_json_field(data, "orderid", str)
+    Flask->>Flask: _get_json_field(data, "sku", str)
+    Flask->>Flask: _get_json_field(data, "qty", int)
+    note right of Flask: Creates Allocate command
+    Flask->>MBus: bus.handle(commands.Allocate(orderid, sku, qty))
+
+    MBus->>Handler: allocate(cmd, uow)
+    activate Handler
+    note over Handler: Creates OrderLine(cmd.orderid, cmd.sku, cmd.qty)
+    Handler->>UoW: with uow:
+    activate UoW
+    Handler->>UoW: uow.products.get(sku=line.sku)
+    UoW->>Repo: repository.get(sku)
+    activate Repo
+    Repo-->>UoW: product (or None)
+    deactivate Repo
+    UoW-->>Handler: product
+
+    alt product is None
+        Handler-->>Flask: raise InvalidSku
+    else product found
+        Handler->>Product: product.allocate(line)
+        activate Product
+        note over Product: Finds suitable batch and allocates
+        Product-->>Handler: batchref (string)
+        deactivate Product
+
+        Handler->>UoW: uow.commit()
+        note right of UoW: Flushes changes to database
+        UoW-->>Handler: committed
+        deactivate UoW
+    end
+
+    Handler-->>MBus: returns (batchref or exception)
+    deactivate Handler
+    MBus-->>Flask: returns to bus.handle()
+    deactivate Flask
+
+    alt Success (batchref returned)
+        Flask-->>Client: 202 OK
+    else InvalidSku Exception
+        Flask-->>Client: 400 Bad Request
+    end
+
+    %% Context sources:
+    %% Flask: src/allocation/entrypoints/flask_app.py - allocate_endpoint
+    %% MBus: src/allocation/service_layer/messagebus.py - MessageBus
+    %% Handler: src/allocation/service_layer/handlers.py - allocate
+    %% UoW: src/allocation/service_layer/unit_of_work.py - AbstractUnitOfWork
+    %% Repo: src/allocation/adapters/repository.py - AbstractRepository
+    %% Product: src/allocation/domain/model.py - Product.allocate

@@ -1,0 +1,100 @@
+---
+config:
+  layout: elk
+---
+classDiagram
+    direction TB
+    namespace domain {
+        class Product {
+            - sku: str
+            - batches: List~Batch~
+            - version_number: int
+            + allocate(line: OrderLine): str
+            + change_batch_quantity(ref: str, qty: int)
+            + deallocate(line: OrderLine)
+        }
+        class Batch {
+            - ref: str
+            - sku: str
+            - qty: int
+            - eta: Optional~date~
+            + allocate(line: OrderLine)
+            + deallocate(line: OrderLine)
+            + can_deallocate(line: OrderLine): bool
+            + deallocate_one() -> OrderLine
+            + allocated_quantity: int
+            + available_quantity: int
+            + can_allocate(line: OrderLine) -> bool
+        }
+        class OrderLine {
+            - orderid: str
+            - sku: str
+            - qty: int
+        }
+    }
+    namespace commands {
+        class Command {
+            <<Abstract>>
+        }
+        class Allocate {
+            <<Command>>
+            - orderid: str
+            - sku: str
+            - qty: int
+        }
+        class Deallocate {
+            <<Command>>
+            - orderid: str
+            - sku: str
+            - qty: int
+        }
+        class CreateBatch {
+            <<Command>>
+            - ref: str
+            - sku: str
+            - qty: int
+            - eta: Optional~date~
+        }
+        class ChangeBatchQuantity {
+            <<Command>>
+            - ref: str
+            - qty: int
+        }
+    }
+    namespace events {
+        class Event {
+            <<Abstract>>
+        }
+        class Allocated {
+            <<Event>>
+            - orderid: str
+            - sku: str
+            - batchref: str
+        }
+        class Deallocated {
+            <<Event>>
+            - orderid: str
+            - sku: str
+            - qty: int
+        }
+        class OutOfStock {
+            <<Event>>
+            - sku: str
+        }
+    }
+    Product "1" *-- "0..*" Batch : contains
+    Batch "1" *-- "0..*" OrderLine : allocates
+    Product --> OrderLine : uses
+    Allocate ..|> Command
+    Deallocate ..|> Command
+    CreateBatch ..|> Command
+    ChangeBatchQuantity ..|> Command
+    Allocated ..|> Event
+    Deallocated ..|> Event
+    OutOfStock ..|> Event
+    Product ..> Allocated : emits
+    Product ..> Deallocated : emits
+    Allocate ..> Product : triggers
+    Deallocate ..> Product : triggers
+    CreateBatch ..> Product : triggers
+    ChangeBatchQuantity ..> Product : triggers

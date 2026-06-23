@@ -39,7 +39,7 @@ class Product:
             self.events.append(events.Deallocated(line.orderid, line.sku, line.qty))
 
     def deallocate(self, line: OrderLine):
-        """Explicitly deallocate an order line, emitting a Deallocated event."""
+        """Deallocates an order line from the product's batch by locating a batch that can deallocate it, removing the allocation, incrementing the product's version number, and emitting a Deallocated event. Raises ValueError if no batch can accommodate the deallocation for the given order line."""
         batch = next(
             (b for b in self.batches if b.can_deallocate(line)),
             None,
@@ -93,10 +93,12 @@ class Batch:
             self._allocations.add(line)
 
     def deallocate(self, line: OrderLine):
+        """Removes the specified order line from the batch's allocation set if it is currently allocated; this operation is idempotent and does nothing if the line is not present."""
         if line in self._allocations:
             self._allocations.discard(line)
 
     def can_deallocate(self, line: OrderLine) -> bool:
+        """Checks if the given order line is allocated in this batch, returning True if it can be deallocated (i.e., is in the allocations), False otherwise."""
         return line in self._allocations
 
     def deallocate_one(self) -> OrderLine:

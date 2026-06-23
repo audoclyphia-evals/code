@@ -1,0 +1,90 @@
+openapi: 3.0.3
+info:
+  title: API Documentation
+  description: Auto-generated API documentation
+  version: 1.0.0
+paths:
+  /allocations/<orderid>:
+    route:
+      summary: HTTP endpoint to retrieve allocations view by order ID.
+      description: Documentation generation skipped due to LLM timeout (120s limit
+        exceeded)
+      operationId: ''
+      tags: []
+      responses:
+        '200':
+          description: Success
+  /deallocate:
+    post:
+      summary: Deallocate an order line
+      description: Extracts orderid, sku, qty from JSON body, validates, and dispatches
+        a Deallocate command via message bus.
+      operationId: deallocateOrderLine
+      tags:
+      - allocation
+      responses:
+        '202':
+          description: Order line deallocated successfully
+        '400':
+          description: Invalid input or deallocation error
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - orderid
+              - sku
+              - qty
+              properties:
+                orderid:
+                  type: string
+                  description: Order identifier
+                sku:
+                  type: string
+                  description: Stock keeping unit
+                qty:
+                  type: integer
+                  description: Quantity to deallocate
+            example:
+              orderid: '123'
+              sku: SKU123
+              qty: 10
+    route:
+      summary: Handles POST /deallocate to deallocate an order line by extracting
+        orderid, sku, qty from JSON, validating, and dispatching a Deallocate command
+        via the message bus.
+      description: Documentation generation skipped due to LLM timeout (120s limit
+        exceeded)
+      operationId: ''
+      tags: []
+      responses:
+        '200':
+          description: Success
+  /allocate:
+    route:
+      summary: Handles POST /allocate to allocate an order line by extracting orderid,
+        sku, qty from JSON, validating, and dispatching an Allocate command via the
+        message bus.
+      description: Documentation generation skipped due to LLM timeout (120s limit
+        exceeded)
+      operationId: ''
+      tags: []
+      responses:
+        '200':
+          description: Success
+  /add_batch:
+    route:
+      summary: Handles POST /add_batch to create a batch by extracting ref, sku, qty,
+        and optional eta from JSON, validating them, and dispatching a CreateBatch
+        command via the message bus.
+      description: Documentation generation skipped due to LLM timeout (120s limit
+        exceeded)
+      operationId: ''
+      tags: []
+      responses:
+        '200':
+          description: Success
+tags:
+- name: allocation

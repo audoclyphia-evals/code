@@ -1,4 +1,4 @@
-# pylint: disable=unused-argument
+# pylint: disable=unused-argument  # Module defining command and event handlers for the allocation service layer, including functions for batch operations, order allocation, deallocation, and notifications, each accepting a command/event and a unit of work or publisher as parameters.
 from __future__ import annotations
 from dataclasses import asdict
 from typing import List, Dict, Callable, Type, TYPE_CHECKING
@@ -16,6 +16,7 @@ class InvalidSku(Exception):
 
 
 class InvalidDeallocation(Exception):
+    """Exception raised to indicate an invalid deallocation operation, such as attempting to deallocate a line that isn't allocated or other domain rule violations during deallocation."""
     pass
 
 
@@ -46,6 +47,7 @@ def allocate(
 
 
 def deallocate(
+    """Processes the Deallocate command by creating an OrderLine, fetching the corresponding product via the unit of work, and invoking the domain model's deallocation method. Handles exceptions by converting ValueError to InvalidDeallocation and commits changes upon success."""
     cmd: commands.Deallocate,
     uow: unit_of_work.AbstractUnitOfWork,
 ):
@@ -69,6 +71,7 @@ def reallocate(
 
 
 def change_batch_quantity(
+    """Handles the ChangeBatchQuantity command by retrieving the product associated with the given batch reference, updating the batch quantity in the domain model, and committing the transaction. Raises ValueError if no product is found for the batch reference."""
     cmd: commands.ChangeBatchQuantity,
     uow: unit_of_work.AbstractUnitOfWork,
 ):
@@ -101,6 +104,7 @@ def publish_allocated_event(
 
 
 def add_allocation_to_read_model(
+    """Responds to Allocated events by inserting a new allocation record into the read model (allocations_view) using the order ID, SKU, and batch reference from the event, and commits the transaction."""
     event: events.Allocated,
     uow: unit_of_work.SqlAlchemyUnitOfWork,
 ):
@@ -116,6 +120,7 @@ def add_allocation_to_read_model(
 
 
 def remove_allocation_from_read_model(
+    """Responds to Deallocated events by deleting the corresponding allocation record from the read model (allocations_view) based on the order ID and SKU from the event, and commits the transaction."""
     event: events.Deallocated,
     uow: unit_of_work.SqlAlchemyUnitOfWork,
 ):
