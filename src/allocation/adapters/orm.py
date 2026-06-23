@@ -7,9 +7,11 @@ from sqlalchemy import (
     String,
     Date,
     ForeignKey,
+    UniqueConstraint,
     event,
 )
-from sqlalchemy.orm import mapper, relationship
+from sqlalchemy.orm import mapper, relationship, class_mapper
+import sqlalchemy.exc
 
 from allocation.domain import model
 
@@ -54,13 +56,22 @@ allocations = Table(
 allocations_view = Table(
     "allocations_view",
     metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
     Column("orderid", String(255)),
     Column("sku", String(255)),
     Column("batchref", String(255)),
+    UniqueConstraint("orderid", "sku", name="uq_allocations_view_orderid_sku"),
 )
 
 
 def start_mappers():
+    try:
+        class_mapper(model.Product)
+        logger.info("Mappers already started, skipping")
+        return
+    except sqlalchemy.exc.NoInspectionAvailable:
+        pass
+
     logger.info("Starting mappers")
     lines_mapper = mapper(model.OrderLine, order_lines)
     batches_mapper = mapper(

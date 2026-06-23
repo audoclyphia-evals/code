@@ -27,3 +27,10 @@ class CreateBatch(Command):
 class ChangeBatchQuantity(Command):
     ref: str
     qty: int
+
+
+@dataclass
+class Deallocate(Command):
+    orderid: str
+    sku: str
+    qty: int

@@ -1,4 +1,4 @@
-# pylint: disable=broad-except, attribute-defined-outside-init
+# pylint: disable=broad-except
 from __future__ import annotations
 import logging
 from typing import Callable, Dict, List, Union, Type, TYPE_CHECKING
@@ -22,6 +22,7 @@ class MessageBus:
         self.uow = uow
         self.event_handlers = event_handlers
         self.command_handlers = command_handlers
+        self.queue = []  # type: List[Message]
 
     def handle(self, message: Message):
         self.queue = [message]

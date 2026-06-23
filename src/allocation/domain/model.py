@@ -1,4 +1,5 @@
 from __future__ import annotations
+import functools
 from dataclasses import dataclass
 from datetime import date
 from typing import Optional, List, Set
@@ -37,6 +38,21 @@ class Product:
             line = batch.deallocate_one()
             self.events.append(events.Deallocated(line.orderid, line.sku, line.qty))
 
+    def deallocate(self, line: OrderLine):
+        """Explicitly deallocate an order line, emitting a Deallocated event."""
+        batch = next(
+            (b for b in self.batches if b.can_deallocate(line)),
+            None,
+        )
+        if batch is None:
+            raise ValueError(
+                f"Cannot deallocate: no batch found with an allocation for "
+                f"order '{line.orderid}', sku '{line.sku}'"
+            )
+        batch.deallocate(line)
+        self.version_number += 1
+        self.events.append(events.Deallocated(line.orderid, line.sku, line.qty))
+
 
 @dataclass(unsafe_hash=True)
 class OrderLine:
@@ -45,6 +61,7 @@ class OrderLine:
     qty: int
 
 
+@functools.total_ordering
 class Batch:
     def __init__(self, ref: str, sku: str, qty: int, eta: Optional[date]):
         self.reference = ref
@@ -74,6 +91,13 @@ class Batch:
     def allocate(self, line: OrderLine):
         if self.can_allocate(line):
             self._allocations.add(line)
+
+    def deallocate(self, line: OrderLine):
+        if line in self._allocations:
+            self._allocations.discard(line)
+
+    def can_deallocate(self, line: OrderLine) -> bool:
+        return line in self._allocations
 
     def deallocate_one(self) -> OrderLine:
         return self._allocations.pop()

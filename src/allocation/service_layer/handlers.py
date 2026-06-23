@@ -2,6 +2,7 @@
 from __future__ import annotations
 from dataclasses import asdict
 from typing import List, Dict, Callable, Type, TYPE_CHECKING
+from sqlalchemy import text
 from allocation.domain import commands, events, model
 from allocation.domain.model import OrderLine
 
@@ -11,6 +12,10 @@ if TYPE_CHECKING:
 
 
 class InvalidSku(Exception):
+    pass
+
+
+class InvalidDeallocation(Exception):
     pass
 
 
@@ -40,6 +45,22 @@ def allocate(
         uow.commit()
 
 
+def deallocate(
+    cmd: commands.Deallocate,
+    uow: unit_of_work.AbstractUnitOfWork,
+):
+    line = OrderLine(cmd.orderid, cmd.sku, cmd.qty)
+    with uow:
+        product = uow.products.get(sku=line.sku)
+        if product is None:
+            raise InvalidSku(f"Invalid sku {line.sku}")
+        try:
+            product.deallocate(line)
+        except ValueError as e:
+            raise InvalidDeallocation(str(e)) from e
+        uow.commit()
+
+
 def reallocate(
     event: events.Deallocated,
     uow: unit_of_work.AbstractUnitOfWork,
@@ -53,6 +74,8 @@ def change_batch_quantity(
 ):
     with uow:
         product = uow.products.get_by_batchref(batchref=cmd.ref)
+        if product is None:
+            raise ValueError(f"No product found for batch ref '{cmd.ref}'")
         product.change_batch_quantity(ref=cmd.ref, qty=cmd.qty)
         uow.commit()
 
@@ -83,10 +106,10 @@ def add_allocation_to_read_model(
 ):
     with uow:
         uow.session.execute(
-            """
-            INSERT INTO allocations_view (orderid, sku, batchref)
-            VALUES (:orderid, :sku, :batchref)
-            """,
+            text(
+                "INSERT INTO allocations_view (orderid, sku, batchref) "
+                "VALUES (:orderid, :sku, :batchref)"
+            ),
             dict(orderid=event.orderid, sku=event.sku, batchref=event.batchref),
         )
         uow.commit()
@@ -98,10 +121,10 @@ def remove_allocation_from_read_model(
 ):
     with uow:
         uow.session.execute(
-            """
-            DELETE FROM allocations_view
-            WHERE orderid = :orderid AND sku = :sku
-            """,
+            text(
+                "DELETE FROM allocations_view "
+                "WHERE orderid = :orderid AND sku = :sku"
+            ),
             dict(orderid=event.orderid, sku=event.sku),
         )
         uow.commit()
@@ -117,4 +140,5 @@ COMMAND_HANDLERS = {
     commands.Allocate: allocate,
     commands.CreateBatch: add_batch,
     commands.ChangeBatchQuantity: change_batch_quantity,
+    commands.Deallocate: deallocate,
 }  # type: Dict[Type[commands.Command], Callable]
