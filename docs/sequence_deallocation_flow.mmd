@@ -1,0 +1,37 @@
+sequenceDiagram
+    autonumber
+    participant Flask as "Flask Endpoint"
+    participant Bus as "Message Bus"
+    participant Handler as "Deallocate Handler"
+    participant UoW as "Unit of Work"
+    participant Product as "Product"
+    participant Batch as "Batch"
+
+    Flask->>Bus: handle(DeallocateCommand)
+    Bus->>Handler: deallocate(cmd, uow)
+    Handler->>UoW: products.get(sku)
+    UoW-->>Handler: product
+    
+    alt product is None
+        Handler-->>Bus: raise InvalidSku
+    else product exists
+        Handler->>Product: deallocate(orderline)
+        
+        Product->>Batch: can_deallocate(line)
+        Batch-->>Product: bool
+        
+        alt can deallocate
+            Product->>Batch: deallocate(line)
+            Batch-->>Product: None
+            Product->>Product: version_number += 1
+            Product->>Product: events.append(Deallocated)
+            Product-->>Handler: None
+            Handler->>UoW: commit()
+            UoW-->>Handler: None
+        else cannot deallocate
+            Product-->>Handler: ValueError
+            Handler-->>Bus: raise InvalidDeallocation
+        end
+    end
+    
+    Bus-->>Flask: OK

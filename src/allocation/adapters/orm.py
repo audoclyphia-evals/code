@@ -1,4 +1,4 @@
-import logging
+import logging  # Defines SQLAlchemy ORM metadata and table schemas for the allocation system, including order_lines, batches, allocations, and allocations_view tables. Provides the start_mappers function to configure ORM mappers and includes an event listener for model.Product load events.
 from sqlalchemy import (
     Table,
     MetaData,
@@ -65,6 +65,7 @@ allocations_view = Table(
 
 
 def start_mappers():
+    """Configures SQLAlchemy ORM mappers for domain model classes: OrderLine, Batch, and Product. It first checks if mappers are already started to prevent duplication, then sets up mappers with relationships, such as linking Batch to OrderLine through allocations and Product to Batch."""
     try:
         class_mapper(model.Product)
         logger.info("Mappers already started, skipping")

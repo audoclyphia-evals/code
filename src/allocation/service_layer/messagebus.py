@@ -1,4 +1,4 @@
-# pylint: disable=broad-except
+# pylint: disable=broad-except  # Module that defines the MessageBus class for dispatching commands and events in the allocation service layer. It imports domain-specific commands and events, defines a Message type alias for Command and Event objects, sets up logging, and includes a type hint for unit_of_work. The MessageBus class is designed to handle message processing with transactional consistency.
 from __future__ import annotations
 import logging
 from typing import Callable, Dict, List, Union, Type, TYPE_CHECKING
@@ -14,6 +14,7 @@ Message = Union[commands.Command, events.Event]
 
 class MessageBus:
     def __init__(
+        """Initializes the MessageBus with a unit of work, event handlers dictionary (mapping event types to handler callables), command handlers dictionary (mapping command types to handler callables), and an empty message queue. This method sets up the bus to manage command and event dispatching, using the unit of work for transactional state management, and prepares for message queuing during processing."""
         self,
         uow: unit_of_work.AbstractUnitOfWork,
         event_handlers: Dict[Type[events.Event], List[Callable]],

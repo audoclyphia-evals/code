@@ -1,0 +1,81 @@
+flowchart TB
+    %% Entry Points Tier
+    subgraph Entry_Points [Entry Points]
+        %% source: cluster_1: entrypoints/flask_app.py with routes /add_batch, /allocate, /deallocate, /allocations/<orderid>
+        flask[Flask API]
+        %% source: entrypoints/redis_eventconsumer.py
+        redis_consumer[Redis Event Consumer]
+    end
+
+    %% Service Layer Tier
+    subgraph Service_Layer [Service Layer]
+        %% source: service_layer/messagebus.py
+        bus[Message Bus]
+        %% source: service_layer/handlers.py with COMMAND_HANDLERS and EVENT_HANDLERS dicts
+        handlers[Command and Event Handlers]
+        %% source: service_layer/unit_of_work.py (AbstractUnitOfWork and SqlAlchemyUnitOfWork)
+        uow[Unit of Work]
+    end
+
+    %% Domain Tier
+    subgraph Domain [Domain Layer]
+        %% source: domain/model.py Product class
+        product[Product Aggregate]
+        %% source: domain/model.py Batch class
+        batch[Batch]
+        %% source: domain/model.py OrderLine dataclass
+        orderline[OrderLine]
+        %% source: domain/commands.py (Allocate, Deallocate, CreateBatch, ChangeBatchQuantit)
+        commands[Commands]
+        %% source: domain/events.py (Allocated, Deallocated, OutOfStock)
+        events[Events]
+    end
+
+    %% Infrastructure/Adapters Tier
+    subgraph Adapters [Adapters Layer]
+        %% source: adapters/orm.py
+        orm[ORM]
+        %% source: adapters/repository.py (AbstractRepository, SqlAlchemyRepository)
+        repo[Repository]
+        %% source: adapters/redis_eventpublisher.py
+        redis_pub[Redis Publisher]
+        %% source: adapters/notifications.py (AbstractNotifications)
+        notifications[Notifications]
+        %% source: service_layer/handlers.py functions add_allocation_to_read_model, remove_allocation_from_read_model
+        read_model[Read Model]
+    end
+
+    %% External Services
+    subgraph External [External Infrastructure]
+        %% source: docker-compose.yml service postgres
+        postgres[(PostgreSQL)]
+        %% source: docker-compose.yml service redis
+        redis[(Redis)]
+        %% source: docker-compose.yml service mailhog, abstracted to Email Service
+        email_service[(Email Service)]
+    end
+
+    %% Relationships
+    flask -->|HTTP| bus
+    redis_consumer --> bus
+    bus --> handlers
+    handlers --> commands
+    %% New relationship: events also trigger handlers
+    events -.-> handlers
+    handlers --> events
+    handlers --> uow
+    uow --> repo
+    repo --> orm
+    orm --> postgres
+    product --> batch
+    batch --> orderline
+
+    redis_pub -->|Publish| redis
+    handlers --> redis_pub
+    notifications --> email_service
+    handlers --> notifications
+    redis -->|Consume| redis_consumer
+
+    %% New relationships from context
+    handlers --> read_model
+    flask -->|Query| read_model

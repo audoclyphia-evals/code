@@ -1,0 +1,50 @@
+sequenceDiagram
+    %% source: Cluster_1 (Flask API endpoints)
+    actor User as "HTTP Client"
+    %% source: src/allocation/entrypoints/flask_app.py#add_batch endpoint
+    participant FlaskEndpoint as "add_batch Flask Route"
+    %% source: src/allocation/service_layer/messagebus.py#MessageBus
+    participant MessageBus as "MessageBus"
+    %% source: src/allocation/service_layer/handlers.py#add_batch handler
+    participant Handler as "add_batch Handler"
+    %% source: src/allocation/service_layer/unit_of_work.py#AbstractUnitOfWork
+    participant UoW as "Unit of Work"
+    %% source: src/allocation/adapters/repository.py#AbstractRepository
+    participant Repository as "Product Repository"
+    %% source: src/allocation/domain/model.py#Product class
+    participant Product as "Product"
+
+    User->>FlaskEndpoint: POST /add_batch (ref, sku, qty, eta)
+    Note right of FlaskEndpoint: Validate JSON fields
+    FlaskEndpoint->>MessageBus: handle(CreateBatch command)
+    MessageBus->>Handler: add_batch(cmd, uow)
+    
+    %% source: Unit of Work context manager pattern
+    Handler->>UoW: Enter context
+    UoW->>Repository: Get product by SKU
+    Repository-->>UoW: Return product or None
+    
+    alt Product exists
+        %% source: Product.add_batch method
+        UoW->>Product: add_batch(ref, sku, qty, eta)
+        Product-->>UoW: Batch added to product
+    else Product doesn't exist
+        %% source: Product.__init__ constructor - creates new product
+        UoW->>Product: Create new Product(sku)
+        Product-->>UoW: New product instance created
+    end
+    
+    UoW->>UoW: Commit transaction
+    Note right of UoW: Persist to database
+    UoW-->>Handler: Context exit
+    
+    Handler-->>MessageBus: Return
+    
+    %% source: Event handling loop in MessageBus
+    loop Process domain events
+        MessageBus->>MessageBus: Dispatch any published events
+    end
+    
+    MessageBus-->>FlaskEndpoint: Return
+    
+    FlaskEndpoint-->>User: 201 Created

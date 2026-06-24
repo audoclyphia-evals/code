@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime  # Flask application entry point that initializes the app, bootstraps the message bus, and defines routes for batch creation, order allocation and deallocation, and allocation views. Includes helper functions and endpoint handlers.
 from flask import Flask, jsonify, request
 from allocation.domain import commands
 from allocation.service_layer.handlers import InvalidSku, InvalidDeallocation
@@ -9,7 +9,7 @@ bus = bootstrap.bootstrap()
 
 
 def _get_json_field(data: dict, field: str, expected_type: type):
-    """Return field value or raise ValueError with a clear message."""
+    """Extracts a field from a JSON-like dictionary, ensuring it exists and matches the expected type. Raises KeyError if the field is absent, and TypeError if the value is not of the specified type."""
     if field not in data:
         raise KeyError(field)
     value = data[field]
@@ -23,6 +23,7 @@ def _get_json_field(data: dict, field: str, expected_type: type):
 
 @app.route("/add_batch", methods=["POST"])
 def add_batch():
+    """Flask endpoint for POST /add_batch that extracts ref, sku, qty, and optional eta from JSON, validates required fields with _get_json_field and eta format, and dispatches a CreateBatch command. Returns HTTP 400 for validation errors or invalid eta, and HTTP 201 on successful batch creation."""
     data = request.get_json(silent=True) or {}
     try:
         ref = _get_json_field(data, "ref", str)
@@ -43,6 +44,7 @@ def add_batch():
 
 @app.route("/allocate", methods=["POST"])
 def allocate_endpoint():
+    """Flask endpoint for POST /allocate that extracts orderid, sku, and qty from JSON, validates them using _get_json_field, and dispatches an Allocate command via the message bus. Returns HTTP 400 on validation errors or invalid SKU, and HTTP 202 on successful allocation."""
     data = request.get_json(silent=True) or {}
     try:
         orderid = _get_json_field(data, "orderid", str)
@@ -62,6 +64,7 @@ def allocate_endpoint():
 
 @app.route("/deallocate", methods=["POST"])
 def deallocate_endpoint():
+    """Flask endpoint for POST /deallocate that parses JSON to extract orderid, sku, and qty, validates them using _get_json_field, and dispatches a Deallocate command via the message bus. Returns HTTP 400 on validation errors or invalid deallocation, and HTTP 202 on success."""
     data = request.get_json(silent=True) or {}
     try:
         orderid = _get_json_field(data, "orderid", str)
